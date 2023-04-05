@@ -1,5 +1,6 @@
 *.iml
-.gradle
+.gradle/buildOutputCleanup
+.gradle/7.4.2
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -16,4 +17,3 @@ local.properties
 /samples/build
 /processor/build
 /annotations/build
-/gradle
