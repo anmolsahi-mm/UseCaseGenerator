@@ -1,4 +1,5 @@
 *.iml
+.gradle
 .gradle/buildOutputCleanup
 .gradle/7.4.2
 /local.properties
