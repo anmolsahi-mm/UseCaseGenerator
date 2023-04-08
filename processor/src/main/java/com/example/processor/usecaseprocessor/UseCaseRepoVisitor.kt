@@ -2,7 +2,6 @@ package com.example.processor.usecaseprocessor
 
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.processing.CodeGenerator
-import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.KotlinPoetKspPreview
@@ -15,7 +14,7 @@ data class Funcs(
     var returnType: KSTypeReference? = null
 )
 
-class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val logger: KSPLogger) : KSVisitorVoid() {
+class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVoid() {
 
     private val functions = mutableListOf<Funcs>()
 
@@ -23,58 +22,80 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val l
     override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
         classDeclaration.getDeclaredFunctions().forEach { it.accept(this, Unit) }
         val packageName = classDeclaration.packageName.asString()
-        val className = "${classDeclaration}UseCase"
-        val fileSpec = FileSpec.builder(packageName, className).apply {
-            addType(
-                TypeSpec.classBuilder(className)
-                    .primaryConstructor(
-                        FunSpec.constructorBuilder()
-                            .addParameter(getConstrucotrParams(classDeclaration))
-                            .build()
-                    ).addProperty(
-                        PropertySpec.builder("$classDeclaration".lowercase(), getTypeName(classDeclaration))
-                            .initializer("$classDeclaration".lowercase()).build()
-                    ).addModifiers(KModifier.OPEN)
-                    .addFunctions(getAllFunctions(classDeclaration)).build()
-            )
-        }.build()
-        fileSpec.writeTo(codeGenerator, true)
-    }
 
-    @OptIn(KotlinPoetKspPreview::class, ExperimentalStdlibApi::class)
-    private fun getAllFunctions(classDeclaration: KSClassDeclaration): Iterable<FunSpec> {
-        val listOfFunctions = mutableListOf<FunSpec>()
-        functions.forEach {
-            val returnType = it.returnType!!.toTypeName()
-            val paramName = classDeclaration.toString().lowercase()
-            val listOfFunctionParams = mutableListOf<ParameterSpec>()
-            var parametersToGenerate = ""
+        val constructorParameter = "$classDeclaration"
+        val constructorParamName: String = buildString {
+            append(constructorParameter[0].lowercase())
+            append(constructorParameter.substring(1))
+        }
 
-            it.functionParams.forEach { functionParam ->
-                val parameterName = functionParam.toString()
-                parametersToGenerate += "$parameterName,"
-                listOfFunctionParams.add(
-                    ParameterSpec.builder(parameterName, functionParam.type.toTypeName()).build()
-                )
+        classDeclaration.getDeclaredFunctions().forEachIndexed { index, functionDeclaration ->
+            val classString = "${functionDeclaration}UseCase"
+            val className = buildString {
+                append(classString[0].uppercase())
+                append(classString.substring(1))
             }
 
-            listOfFunctions.add(
-                FunSpec.builder("invoke")
-                    .addModifiers(KModifier.OPERATOR, KModifier.SUSPEND)
-                    .addParameters(
-                        listOfFunctionParams
-                    )
-                    .returns(returnType)
-                    .addStatement("return $paramName.${it.functionName}($parametersToGenerate)")
-                    .build()
-            )
+            val fileSpec = FileSpec.builder(packageName, className).apply {
+                addType(
+                    TypeSpec.classBuilder(className)
+                        .primaryConstructor(
+                            FunSpec.constructorBuilder()
+                                .addParameter(getConstructorParameter(constructorParamName, classDeclaration))
+                                .build()
+                        ).addProperty(
+                            PropertySpec.builder(constructorParamName, getTypeName(classDeclaration))
+                                .initializer(constructorParamName).build()
+                        ).addFunction(getIndexedFunction(classDeclaration, index)).build()
+                )
+            }.build()
+            fileSpec.writeTo(codeGenerator, true)
         }
-        return listOfFunctions
     }
 
-    private fun getConstrucotrParams(classDeclaration: KSClassDeclaration): ParameterSpec {
-        return ParameterSpec("$classDeclaration".lowercase(), getTypeName(classDeclaration)).toBuilder()
-            .addModifiers(KModifier.PRIVATE).build()
+    @OptIn(KotlinPoetKspPreview::class)
+    private fun getIndexedFunction(classDeclaration: KSClassDeclaration, index: Int): FunSpec {
+
+        val indexedFunction = functions[index]
+
+        val returnType = indexedFunction.returnType!!.toTypeName()
+
+        val constructorParamName = "$classDeclaration"
+        val paramName = buildString {
+            append(constructorParamName[0].lowercase())
+            append(constructorParamName.substring(1))
+        }
+
+        val listOfFunctionParams = mutableListOf<ParameterSpec>()
+        var parametersToGenerate = ""
+
+        indexedFunction.functionParams.forEach { functionParam ->
+            val parameterName = functionParam.toString()
+            parametersToGenerate += "$parameterName,"
+            listOfFunctionParams.add(
+                ParameterSpec.builder(parameterName, functionParam.type.toTypeName()).build()
+            )
+        }
+
+        return FunSpec.builder("invoke")
+            .addModifiers(KModifier.OPERATOR, KModifier.SUSPEND)
+            .addParameters(
+                listOfFunctionParams
+            )
+            .returns(returnType)
+            .addStatement("return $paramName.${indexedFunction.functionName}(${parametersToGenerate.removeSuffix(",")})")
+            .build()
+    }
+
+    private fun getConstructorParameter(
+        constructorParamName: String,
+        classDeclaration: KSClassDeclaration
+    ): ParameterSpec {
+
+
+        return ParameterSpec(constructorParamName, getTypeName(classDeclaration)).toBuilder()
+            .addModifiers(KModifier.PRIVATE)
+            .build()
     }
 
     private fun getTypeName(classDeclaration: KSClassDeclaration): TypeName {

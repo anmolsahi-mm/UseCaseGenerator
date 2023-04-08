@@ -16,7 +16,7 @@ class UseCaseProcessor(private val codeGenerator: CodeGenerator, private val log
         }
         symbols?.let { symbol ->
             symbol.filter { it is KSClassDeclaration && it.validate() }.forEach {
-                it.accept(UseCaseRepoVisitor(codeGenerator, logger), Unit)
+                it.accept(UseCaseRepoVisitor(codeGenerator), Unit)
             }
         }
         return symbols?.filter { !it.validate() }?.toList() ?: emptyList()
