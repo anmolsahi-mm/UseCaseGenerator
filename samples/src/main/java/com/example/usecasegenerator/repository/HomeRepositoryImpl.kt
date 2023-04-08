@@ -8,4 +8,8 @@ class HomeRepositoryImpl: HomeRepository {
     override suspend fun saveUserInfo(userInfo: UserInfo) {
         // save the user info here
     }
+
+    override suspend fun getMoreData(requestData: String): Map<List<String>, Int> {
+        return mapOf()
+    }
 }

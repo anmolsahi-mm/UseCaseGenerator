@@ -14,7 +14,7 @@ data class Funcs(
     var returnType: KSTypeReference? = null
 )
 
-class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVoid() {
+class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val skipUseCaseSymbols: Sequence<KSFunctionDeclaration>) : KSVisitorVoid() {
 
     private val functions = mutableListOf<Funcs>()
 
@@ -25,7 +25,9 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
 
         val constructorParameter = getConstructorParamName(classDeclaration)
 
-        classDeclaration.getDeclaredFunctions().forEachIndexed { index, functionDeclaration ->
+        val qualifiedFunctionDeclarations = compareSequences(classDeclaration.getDeclaredFunctions(), skipUseCaseSymbols)
+
+        qualifiedFunctionDeclarations.forEachIndexed { index, functionDeclaration ->
             val classString = "${functionDeclaration}UseCase"
             val className = buildString {
                 append(classString[0].uppercase())
@@ -98,6 +100,14 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
 
     private fun getTypeName(classDeclaration: KSClassDeclaration): TypeName {
         return ClassName(classDeclaration.packageName.asString(), "$classDeclaration")
+    }
+
+    private fun compareSequences(
+        firstSeq: Sequence<KSFunctionDeclaration>,
+        secondSeq: Sequence<KSFunctionDeclaration>
+    ): Sequence<KSFunctionDeclaration> {
+        val secondSet = secondSeq.toSet()
+        return firstSeq.filterNot { secondSet.contains(it) }
     }
 
     override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Unit) {
