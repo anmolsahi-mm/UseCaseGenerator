@@ -3,26 +3,19 @@ package com.example.processor.usecaseprocessor
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSTypeReference
-import com.google.devtools.ksp.symbol.KSVisitorVoid
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.ParameterSpec
-import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.TypeSpec
+import com.google.devtools.ksp.symbol.*
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.KotlinPoetKspPreview
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import com.squareup.kotlinpoet.typeNameOf
 
-data class Funcs(val functionName: String, var returnType: KSTypeReference? = null)
+data class Funcs(
+    val functionName: String,
+    val functionParams: List<KSValueParameter>,
+    var returnType: KSTypeReference? = null
+)
 
-class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val logger: KSPLogger) : KSVisitorVoid(){
+class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val logger: KSPLogger) : KSVisitorVoid() {
 
     private val functions = mutableListOf<Funcs>()
 
@@ -36,11 +29,12 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val l
                 TypeSpec.classBuilder(className)
                     .primaryConstructor(
                         FunSpec.constructorBuilder()
-                            .addParameter(getConstrucotrParams(classDeclaration)).build()
+                            .addParameter(getConstrucotrParams(classDeclaration))
+                            .build()
                     ).addProperty(
-                        PropertySpec.builder("$classDeclaration".lowercase(), getTypeName(classDeclaration)).initializer("$classDeclaration".lowercase()).build()
-                    ).addSuperinterface(getTypeName(classDeclaration))
-                    .addModifiers(KModifier.OPEN, KModifier.PUBLIC)
+                        PropertySpec.builder("$classDeclaration".lowercase(), getTypeName(classDeclaration))
+                            .initializer("$classDeclaration".lowercase()).build()
+                    ).addModifiers(KModifier.OPEN)
                     .addFunctions(getAllFunctions(classDeclaration)).build()
             )
         }.build()
@@ -53,14 +47,25 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val l
         functions.forEach {
             val returnType = it.returnType!!.toTypeName()
             val paramName = classDeclaration.toString().lowercase()
+            val listOfFunctionParams = mutableListOf<ParameterSpec>()
+            var parametersToGenerate = ""
+
+            it.functionParams.forEach { functionParam ->
+                val parameterName = functionParam.toString()
+                parametersToGenerate += "$parameterName,"
+                listOfFunctionParams.add(
+                    ParameterSpec.builder(parameterName, functionParam.type.toTypeName()).build()
+                )
+            }
+
             listOfFunctions.add(
-                FunSpec.builder(it.functionName)
-                    .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                    .addParameter(
-                        ParameterSpec.builder("id", typeNameOf<String>()).build()
+                FunSpec.builder("invoke")
+                    .addModifiers(KModifier.OPERATOR, KModifier.SUSPEND)
+                    .addParameters(
+                        listOfFunctionParams
                     )
                     .returns(returnType)
-                    .addStatement("return $paramName.${it.functionName}(id)")
+                    .addStatement("return $paramName.${it.functionName}($parametersToGenerate)")
                     .build()
             )
         }
@@ -68,7 +73,8 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val l
     }
 
     private fun getConstrucotrParams(classDeclaration: KSClassDeclaration): ParameterSpec {
-        return ParameterSpec("$classDeclaration".lowercase(), getTypeName(classDeclaration))
+        return ParameterSpec("$classDeclaration".lowercase(), getTypeName(classDeclaration)).toBuilder()
+            .addModifiers(KModifier.PRIVATE).build()
     }
 
     private fun getTypeName(classDeclaration: KSClassDeclaration): TypeName {
@@ -77,7 +83,7 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator, private val l
 
 
     override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Unit) {
-        functions.add(Funcs(function.toString()))
+        functions.add(Funcs(function.toString(), function.parameters))
         function.returnType!!.accept(this, Unit)
     }
 
