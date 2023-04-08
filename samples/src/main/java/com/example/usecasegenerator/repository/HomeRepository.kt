@@ -4,7 +4,7 @@ import com.example.annotations.UseCaseRepo
 
 @UseCaseRepo
 interface HomeRepository {
-    suspend fun getHomePageData(id: String) : List<String>
+    suspend fun getHomePageData(id: String, authToken: String) : List<String>
 
     suspend fun saveUserInfo(userInfo: UserInfo)
 }

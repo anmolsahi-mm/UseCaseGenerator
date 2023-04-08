@@ -23,11 +23,7 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
         classDeclaration.getDeclaredFunctions().forEach { it.accept(this, Unit) }
         val packageName = classDeclaration.packageName.asString()
 
-        val constructorParameter = "$classDeclaration"
-        val constructorParamName: String = buildString {
-            append(constructorParameter[0].lowercase())
-            append(constructorParameter.substring(1))
-        }
+        val constructorParameter = getConstructorParamName(classDeclaration)
 
         classDeclaration.getDeclaredFunctions().forEachIndexed { index, functionDeclaration ->
             val classString = "${functionDeclaration}UseCase"
@@ -41,11 +37,11 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
                     TypeSpec.classBuilder(className)
                         .primaryConstructor(
                             FunSpec.constructorBuilder()
-                                .addParameter(getConstructorParameter(constructorParamName, classDeclaration))
+                                .addParameter(getConstructorParameter(constructorParameter, classDeclaration))
                                 .build()
                         ).addProperty(
-                            PropertySpec.builder(constructorParamName, getTypeName(classDeclaration))
-                                .initializer(constructorParamName).build()
+                            PropertySpec.builder(constructorParameter, getTypeName(classDeclaration))
+                                .initializer(constructorParameter).build()
                         ).addFunction(getIndexedFunction(classDeclaration, index)).build()
                 )
             }.build()
@@ -60,11 +56,7 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
 
         val returnType = indexedFunction.returnType!!.toTypeName()
 
-        val constructorParamName = "$classDeclaration"
-        val paramName = buildString {
-            append(constructorParamName[0].lowercase())
-            append(constructorParamName.substring(1))
-        }
+        val constructorParamName = getConstructorParamName(classDeclaration)
 
         val listOfFunctionParams = mutableListOf<ParameterSpec>()
         var parametersToGenerate = ""
@@ -83,7 +75,7 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
                 listOfFunctionParams
             )
             .returns(returnType)
-            .addStatement("return $paramName.${indexedFunction.functionName}(${parametersToGenerate.removeSuffix(",")})")
+            .addStatement("return $constructorParamName.${indexedFunction.functionName}(${parametersToGenerate.removeSuffix(",")})")
             .build()
     }
 
@@ -91,17 +83,22 @@ class UseCaseRepoVisitor(private val codeGenerator: CodeGenerator) : KSVisitorVo
         constructorParamName: String,
         classDeclaration: KSClassDeclaration
     ): ParameterSpec {
-
-
         return ParameterSpec(constructorParamName, getTypeName(classDeclaration)).toBuilder()
             .addModifiers(KModifier.PRIVATE)
             .build()
     }
 
+    private fun getConstructorParamName(classDeclaration: KSClassDeclaration): String {
+       val param =  "$classDeclaration"
+        return buildString {
+            append(param[0].lowercase())
+            append(param.substring(1))
+        }
+    }
+
     private fun getTypeName(classDeclaration: KSClassDeclaration): TypeName {
         return ClassName(classDeclaration.packageName.asString(), "$classDeclaration")
     }
-
 
     override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Unit) {
         functions.add(Funcs(function.toString(), function.parameters))
