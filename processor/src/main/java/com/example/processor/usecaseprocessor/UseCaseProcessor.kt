@@ -12,23 +12,24 @@ import com.google.devtools.ksp.validate
 
 class UseCaseProcessor(private val codeGenerator: CodeGenerator) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = UseCaseRepo::class.qualifiedName?.let { decoratorClass ->
-            resolver.getSymbolsWithAnnotation(decoratorClass)
+        val useCaseClass = UseCaseRepo::class.qualifiedName
+        val skipUseCaseClass = SkipUseCase::class.qualifiedName
+
+        val skipUseCaseFunctions = skipUseCaseClass?.let {
+            resolver.getSymbolsWithAnnotation(it)
+                .filterIsInstance<KSFunctionDeclaration>()
+                .filter(KSFunctionDeclaration::validate)
         }
 
-        val skipUseCaseSymbols = SkipUseCase::class.qualifiedName?.let { skipUseCases ->
-            resolver.getSymbolsWithAnnotation(skipUseCases)
+        val symbols = useCaseClass?.let {
+            resolver.getSymbolsWithAnnotation(it)
+                .filterIsInstance<KSClassDeclaration>()
+                .filter(KSClassDeclaration::validate)
         }
 
-        val skipUseCaseFunctions: MutableList<KSFunctionDeclaration> = mutableListOf()
-
-        skipUseCaseSymbols?.filter { it is KSFunctionDeclaration && it.validate() }?.forEach {
-            skipUseCaseFunctions.add(it as KSFunctionDeclaration)
-        }
-
-        symbols?.let { symbol ->
-            symbol.filter { it is KSClassDeclaration && it.validate() }.forEach {
-                it.accept(UseCaseRepoVisitor(codeGenerator, skipUseCaseFunctions.asSequence()), Unit)
+        symbols?.forEach {
+            if (skipUseCaseFunctions != null) {
+                it.accept(UseCaseRepoVisitor(codeGenerator, skipUseCaseFunctions), Unit)
             }
         }
 
