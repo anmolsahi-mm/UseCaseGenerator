@@ -1,5 +1,5 @@
 package com.example.annotations
 
-@Target(AnnotationTarget.CLASS)
+@Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
-annotation class UseCaseRepo
+annotation class SkipUseCase
